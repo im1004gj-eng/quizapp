@@ -9,7 +9,7 @@ st.set_page_config(page_title="퀴즈 챌린지 V3", layout="centered")
 
 # --- 구글 시트 연결 ---
 # Streamlit Cloud의 Secrets에 시트 URL을 넣거나 아래처럼 직접 입력 (테스트용)
-url = "https://docs.google.com/spreadsheets/d/1myzRfMRdT340grI8LsbXn7rc80fi82DsmPsNdgj2oOg/edit?usp=sharing"
+url = "https://docs.google.com/spreadsheets/d/1myzRfMRdT340grI8LsbXn7rc80fi82DsmPsNdgj2oOg/"
 st.cache_data.clear()
 conn = st.connection("gsheets", type=GSheetsConnection)
 
