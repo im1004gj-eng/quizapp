@@ -14,9 +14,9 @@ st.cache_data.clear()
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 데이터 로드
-    users_df = conn.read(worksheet="users")
-    quiz_df = conn.read(worksheet="quiz")
+    # worksheet 이름 대신 순서(0, 1)로 읽어오기 (이게 더 확실할 때가 있습니다)
+    users_df = conn.read(worksheet="users", ttl=0) # ttl=0은 즉시 업데이트용
+    quiz_df = conn.read(worksheet="quiz", ttl=0)
 
     if 'user' not in st.session_state:
         st.title("🔐 퀴즈 로그인")
