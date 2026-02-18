@@ -14,7 +14,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- 데이터 로드 함수 ---
 def load_data():
-    # users 탭과 quiz 탭을 각각 읽어옵니다.
+    # users 탭과 quiz 탭을 각각 읽어옵니다..
     users = conn.read(spreadsheet=url, worksheet="users")
     quizzes = conn.read(spreadsheet=url, worksheet="quiz")
     return users, quizzes
