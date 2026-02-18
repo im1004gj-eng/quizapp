@@ -1,85 +1,84 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
 import random
 import time
-from datetime import datetime
 
-# --- 설정 (핸드폰용 UI 최적화) ---
-st.set_page_config(page_title="무한 퀴즈 챌린지", layout="centered")
+# --- 페이지 설정 ---
+st.set_page_config(page_title="퀴즈 챌린지 V3", layout="centered")
 
-# --- 퀴즈 DB (데이터가 많아질수록 별도 파일로 분리 추천) ---
-QUIZ_DATA = [
-    {"q": "대한민국의 수도는?", "a": ["서울", "부산", "제주", "인천"], "c": "서울"},
-    {"q": "지구에서 가장 큰 바다는?", "a": ["대서양", "인도양", "태평양", "북극해"], "c": "태평양"},
-    {"q": "사과를 영어로 하면?", "a": ["Banana", "Apple", "Grape", "Orange"], "c": "Apple"},
-    {"q": "가장 가벼운 원소는?", "a": ["산소", "질소", "수소", "탄소"], "c": "수소"},
-    {"q": "MBTI 중 성인군자형은?", "a": ["ISFJ", "ENFP", "ISTP", "ESTJ"], "c": "ISFJ"},
-    # ... 여기에 퀴즈를 50개, 100개 계속 추가하세요!
-]
+# --- 구글 시트 연결 ---
+# Streamlit Cloud의 Secrets에 시트 URL을 넣거나 아래처럼 직접 입력 (테스트용)
+url = "여기에_본인의_구글시트_주소를_넣으세요"
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 로그인 세션 관리 ---
+# --- 데이터 로드 함수 ---
+def load_data():
+    # users 탭과 quiz 탭을 각각 읽어옵니다.
+    users = conn.read(spreadsheet=url, worksheet="users")
+    quizzes = conn.read(spreadsheet=url, worksheet="quiz")
+    return users, quizzes
+
+# --- 앱 로직 시작 ---
+users_df, quiz_df = load_data()
+
 if 'user' not in st.session_state:
-    st.session_state.user = None
-
-def login():
-    st.title("🔐 로그인")
-    user_input = st.text_input("아이디(닉네임)를 입력하세요")
-    if st.button("시작하기"):
-        if user_input:
-            st.session_state.user = user_input
-            st.session_state.score = 0
-            st.session_state.stamina = 5
+    st.title("🔐 퀴즈 로그인")
+    user_id = st.text_input("아이디를 입력하세요")
+    if st.button("접속"):
+        if user_id:
+            # 기존 유저인지 확인
+            user_data = users_df[users_df['username'] == user_id]
+            if user_data.empty:
+                # 신규 유저 등록 (구글 시트에 추가)
+                new_user = pd.DataFrame([{"username": user_id, "score": 0, "stamina": 5}])
+                updated_df = pd.concat([users_df, new_user], ignore_index=True)
+                conn.update(spreadsheet=url, worksheet="users", data=updated_df)
+                st.session_state.score = 0
+                st.session_state.stamina = 5
+            else:
+                st.session_state.score = int(user_data.iloc[0]['score'])
+                st.session_state.stamina = int(user_data.iloc[0]['stamina'])
+            
+            st.session_state.user = user_id
             st.rerun()
 
-def main_game():
-    # 상단 상태바 (모바일용 가독성)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("⚡ 스태미너", f"{st.session_state.stamina}/5")
-    with col2:
-        st.metric("🏆 내 점수", st.session_state.score)
-
-    if st.session_state.stamina <= 0:
-        st.error("⚡ 스태미너 소진! 랭킹을 확인하며 기다리세요.")
-        if st.button("무료 충전 (30초 대기)"):
-            with st.spinner("충전 중..."):
-                time.sleep(5) # MVP용으로 짧게 설정
-                st.session_state.stamina = 5
-                st.rerun()
-        return
-
-    # 퀴즈 무작위 추출
-    if 'current_quiz' not in st.session_state:
-        st.session_state.current_quiz = random.choice(QUIZ_DATA)
-
-    q = st.session_state.current_quiz
-    st.markdown(f"### ❓ {q['q']}")
+else:
+    # --- 메인 게임 화면 ---
+    st.write(f"👋 반갑습니다, **{st.session_state.user}**님!")
     
-    # 버튼형 선택지 (모바일 터치 최적화)
-    for ans in q['a']:
-        if st.button(ans, use_container_width=True):
-            if ans == q['c']:
-                st.success("정답입니다! +10점")
+    col1, col2 = st.columns(2)
+    col1.metric("⚡ 스태미너", f"{st.session_state.stamina}/5")
+    col2.metric("🏆 현재 점수", st.session_state.score)
+
+    # 퀴즈 로직 (랜덤 추출)
+    if 'q_idx' not in st.session_state:
+        st.session_state.q_idx = random.randint(0, len(quiz_df)-1)
+    
+    q = quiz_df.iloc[st.session_state.q_idx]
+    st.markdown(f"### Q. {q['question']}")
+    
+    # 보기 버튼
+    options = [q['opt1'], q['opt2'], q['opt3'], q['opt4']]
+    for opt in options:
+        if st.button(opt, use_container_width=True):
+            if opt == q['answer']:
+                st.success("정답!")
                 st.session_state.score += 10
             else:
-                st.error(f"오답! 정답은 {q['c']}입니다. (스태미너 -1)")
+                st.error(f"오답! 정답은 {q['answer']}")
                 st.session_state.stamina -= 1
             
-            # 다음 문제 준비
-            st.session_state.current_quiz = random.choice(QUIZ_DATA)
+            # DB 업데이트 (점수/스태미너 저장)
+            users_df.loc[users_df['username'] == st.session_state.user, ['score', 'stamina']] = [st.session_state.score, st.session_state.stamina]
+            conn.update(spreadsheet=url, worksheet="users", data=users_df)
+            
+            del st.session_state.q_idx # 다음 문제를 위해 인덱스 삭제
             time.sleep(1)
             st.rerun()
 
-    # 실시간 랭킹 (임시 구현 - 구글 시트 연동 시 실제 데이터 반영)
+    # --- 실시간 랭킹 (DB 기반) ---
     st.divider()
-    st.subheader("📊 실시간 TOP 3")
-    st.table([
-        {"순위": "1위", "아이디": "퀴즈마스터", "점수": 540},
-        {"순위": "2위", "아이디": "열공중", "점수": 320},
-        {"순위": "3위", "아이디": st.session_state.user, "점수": st.session_state.score}
-    ])
-
-# 실행 로직
-if st.session_state.user is None:
-    login()
-else:
-    main_game()
+    st.subheader("📊 전체 랭킹 TOP 5")
+    ranking_df = users_df.sort_values(by="score", ascending=False).head(5)
+    st.table(ranking_df[['username', 'score']])
