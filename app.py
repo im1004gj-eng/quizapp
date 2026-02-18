@@ -73,6 +73,7 @@ else:
                 # 정답 체크
                 if str(opt).strip() == str(q_row.iloc[5]).strip():
                     st.success("✨ 정답입니다!")
+                    st.balloons()  # <--- 이 줄 추가! 화면에 풍선이 팡팡 터집니다.
                     st.session_state.score += 10
                 else:
                     st.error(f"❌ 오답! 정답: {q_row.iloc[5]}")
